@@ -4,6 +4,8 @@
 
 A searchable enchantment library with a vanilla-style interface. Store enchantments from books or equipment, split and combine their levels, then withdraw books or apply several enchantments at once.
 
+[CurseForge](https://www.curseforge.com/minecraft/mc-mods/easy-enchantment-library) · [Issues](https://github.com/lingmu0/easy-enchantment-library/issues)
+
 ## Versions
 
 | Minecraft | Loader | Java | Source branch |
