@@ -1,0 +1,20 @@
+{
+  "variants": {
+    "facing=north": {
+      "model": "enchantment_library:block/enchantment_library",
+      "y": 0
+    },
+    "facing=east": {
+      "model": "enchantment_library:block/enchantment_library",
+      "y": 90
+    },
+    "facing=south": {
+      "model": "enchantment_library:block/enchantment_library",
+      "y": 180
+    },
+    "facing=west": {
+      "model": "enchantment_library:block/enchantment_library",
+      "y": 270
+    }
+  }
+}
