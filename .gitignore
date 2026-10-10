@@ -3,5 +3,6 @@ build/
 run/
 run-data/
 .idea/
+logs/
 *.iml
 .template-baselines.json

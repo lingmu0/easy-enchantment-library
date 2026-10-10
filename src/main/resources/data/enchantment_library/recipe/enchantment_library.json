@@ -1,0 +1,27 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "BGB",
+    "OEO",
+    "OOO"
+  ],
+  "key": {
+    "B": {
+      "item": "minecraft:bookshelf"
+    },
+    "G": {
+      "item": "minecraft:gold_ingot"
+    },
+    "O": {
+      "item": "minecraft:obsidian"
+    },
+    "E": {
+      "item": "minecraft:enchanting_table"
+    }
+  },
+  "result": {
+    "id": "enchantment_library:enchantment_library",
+    "count": 1
+  }
+}

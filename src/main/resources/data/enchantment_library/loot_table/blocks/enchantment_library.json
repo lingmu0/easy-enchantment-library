@@ -1,0 +1,24 @@
+{
+  "type": "minecraft:block",
+  "pools": [
+    {
+      "rolls": 1,
+      "entries": [
+        {
+          "type": "minecraft:item",
+          "name": "enchantment_library:enchantment_library",
+          "functions": [
+            {
+              "function": "minecraft:copy_components",
+              "source": "block_entity",
+              "include": [
+                "enchantment_library:stored_enchantments",
+                "minecraft:container"
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
