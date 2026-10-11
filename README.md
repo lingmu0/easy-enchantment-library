@@ -12,6 +12,7 @@ A searchable enchantment library with a vanilla-style interface. Store enchantme
 | --- | --- | --- | --- |
 | 1.20.1 | Forge 47.4.23+ | 17 | [mc-1.20.1](https://github.com/lingmu0/easy-enchantment-library/tree/mc-1.20.1) |
 | 1.21.1 | NeoForge 21.1.233+ | 21 | [mc-1.21.1](https://github.com/lingmu0/easy-enchantment-library/tree/mc-1.21.1) |
+| 26.1.2 | NeoForge 26.1.2.107+ | 25 | [mc-26.1.2](https://github.com/lingmu0/easy-enchantment-library/tree/mc-26.1.2) |
 
 Install the matching JAR in `mods` on both the client and server. Just Enough Characters (JECh) is optional and only needed on the client for pinyin search. There are no other required mod dependencies. Replace an older JAR when updating; the mod ID remains `enchantment_library`.
 
@@ -37,7 +38,7 @@ Each row has its own slider and checkbox. Dragging a slider selects the row; arr
 
 ![Library interface](docs/media/enchantment-library-interface.png)
 
-The screenshot shows Minecraft 1.21.1. Both versions use the same interface layout.
+The screenshot shows Minecraft 1.21.1. All versions use the same interface layout.
 
 ## Pinyin search
 
@@ -45,7 +46,7 @@ With the matching **Just Enough Characters (JECh)** version installed, search ca
 
 ## Building
 
-Check out the branch for your target Minecraft version and set `JAVA_HOME` to Java 17 for Forge 1.20.1 or Java 21 for NeoForge 1.21.1:
+Check out the branch for your target Minecraft version and set `JAVA_HOME` to Java 17 for Forge 1.20.1, Java 21 for NeoForge 1.21.1, or Java 25 for NeoForge 26.1.2:
 
 ```powershell
 .\gradlew.bat build
@@ -54,7 +55,7 @@ python .\tools\validate_artifact.py
 
 Build output is in `build/libs`. Install the main JAR; `-sources.jar` is for development. Resources can be regenerated with `python tools/generate_resources.py`.
 
-`build` includes 20,062 ledger checks, 27 batch-operation checks and JSON/NBT storage codec checks, without launching Minecraft. The artifact validator checks resources, translations, metadata, Java bytecode and client/server code isolation; Forge artifacts are also checked for reobfuscation. GUI behavior, multiplayer interaction and JECh integration still need in-game verification. Storage uses arbitrary-precision points with a 4096-bit serialization bound.
+`build` includes 20,062 ledger checks, 27 batch-operation checks and JSON/NBT storage codec checks (including the 26.1.2 ValueInput/ValueOutput and previous block storage formats), without launching Minecraft. The artifact validator checks resources, translations, metadata, Java bytecode and client/server code isolation; Forge artifacts are also checked for reobfuscation. GUI behavior, multiplayer interaction and JECh integration still need in-game verification. Storage uses arbitrary-precision points with a 4096-bit serialization bound.
 
 ## 中文
 

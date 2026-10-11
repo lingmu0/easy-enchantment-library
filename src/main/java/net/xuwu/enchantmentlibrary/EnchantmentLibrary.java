@@ -3,7 +3,7 @@ package net.xuwu.enchantmentlibrary;
 import com.mojang.logging.LogUtils;
 import net.minecraft.core.component.DataComponentType;
 import net.minecraft.core.registries.Registries;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.inventory.MenuType;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.CreativeModeTabs;
@@ -37,12 +37,12 @@ public final class EnchantmentLibrary {
     private static final DeferredRegister<MenuType<?>> MENUS = DeferredRegister.create(Registries.MENU, MOD_ID);
     private static final DeferredRegister<DataComponentType<?>> COMPONENTS = DeferredRegister.create(Registries.DATA_COMPONENT_TYPE, MOD_ID);
 
-    public static final DeferredBlock<LibraryBlock> LIBRARY = BLOCKS.register("enchantment_library",
-            () -> new LibraryBlock(BlockBehaviour.Properties.of().mapColor(MapColor.WOOD).sound(SoundType.WOOD).strength(2.5F)));
-    public static final DeferredItem<BlockItem> LIBRARY_ITEM = ITEMS.register("enchantment_library",
-            () -> new LibraryItem(LIBRARY.get(), new Item.Properties().stacksTo(1)));
+    public static final DeferredBlock<LibraryBlock> LIBRARY = BLOCKS.registerBlock("enchantment_library", LibraryBlock::new,
+            properties -> properties.mapColor(MapColor.WOOD).sound(SoundType.WOOD).strength(2.5F));
+    public static final DeferredItem<BlockItem> LIBRARY_ITEM = ITEMS.registerItem("enchantment_library",
+            properties -> new LibraryItem(LIBRARY.get(), properties), properties -> properties.stacksTo(1).useBlockDescriptionPrefix());
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<LibraryBlockEntity>> LIBRARY_ENTITY =
-            BLOCK_ENTITIES.register("enchantment_library", () -> BlockEntityType.Builder.of(LibraryBlockEntity::new, LIBRARY.get()).build(null));
+            BLOCK_ENTITIES.register("enchantment_library", () -> new BlockEntityType<>(LibraryBlockEntity::new, LIBRARY.get()));
     public static final DeferredHolder<MenuType<?>, MenuType<LibraryMenu>> LIBRARY_MENU = MENUS.register("enchantment_library",
             () -> IMenuTypeExtension.create(LibraryMenu::new));
     public static final DeferredHolder<DataComponentType<?>, DataComponentType<LibraryContents>> CONTENTS =
@@ -58,7 +58,7 @@ public final class EnchantmentLibrary {
         bus.addListener(EnchantmentLibrary::creativeTab);
     }
 
-    public static ResourceLocation id(String path) { return ResourceLocation.fromNamespaceAndPath(MOD_ID, path); }
+    public static Identifier id(String path) { return Identifier.fromNamespaceAndPath(MOD_ID, path); }
     private static void creativeTab(BuildCreativeModeTabContentsEvent event) {
         if (event.getTabKey() == CreativeModeTabs.FUNCTIONAL_BLOCKS) event.accept(LIBRARY_ITEM);
     }

@@ -30,15 +30,18 @@ loot = parsed[f'data/{modid}/loot_table/blocks/{modid}.json']
 entry = loot['pools'][0]['entries'][0]
 assert entry['name'] == f'{modid}:{modid}'
 assert set(entry['functions'][0]['include']) == {f'{modid}:stored_enchantments', 'minecraft:container'}
+assert parsed[f'assets/{modid}/items/{modid}.json']['model'] == {'type': 'minecraft:model', 'model': f'{modid}:block/{modid}'}
+assert json.loads((resources / 'pack.mcmeta').read_text())['pack']['min_format'] == [84, 0]
 recipe = parsed[f'data/{modid}/recipe/{modid}.json']
 assert recipe['result'] == {'id': f'{modid}:{modid}', 'count': 1}
+assert all(isinstance(value, str) for value in recipe['key'].values()), '26.1.2 ingredients must be IDs or tags'
 assert all(c == ' ' or c in recipe['key'] for row in recipe['pattern'] for c in row)
-assert not any(key.startswith('data/') and key.split('/')[2] in ('recipes', 'loot_tables') for key in parsed), 'Wrong datapack folder for 1.21.1'
+assert not any(key.startswith('data/') and key.split('/')[2] in ('recipes', 'loot_tables') for key in parsed), 'Wrong datapack folder for 26.1.2'
 
-vanilla = project.parent / 'demo1.21.1/build/moddev/artifacts/neoforge-21.1.233-client-extra-aka-minecraft-resources.jar'
+vanilla = Path.home() / '.gradle/caches/neoformruntime/artifacts/minecraft_26.1.2_client.jar'
 if vanilla.exists():
     with zipfile.ZipFile(vanilla) as z:
-        for resource in re.findall(r'ResourceLocation\.withDefaultNamespace\("([^\"]+)"\)', all_source):
+        for resource in re.findall(r'Identifier\.withDefaultNamespace\("([^\"]+)"\)', all_source):
             asset = f'assets/minecraft/{resource}' if resource.startswith('textures/') else f'assets/minecraft/textures/gui/sprites/{resource}.png'
             assert asset in z.namelist(), f'Missing vanilla GUI resource: {asset}'
         for model_path, model in parsed.items():
@@ -60,7 +63,7 @@ with zipfile.ZipFile(jar) as z:
     classes = [name for name in names if name.endswith('.class')]
     assert len(classes) >= 12
     for name in classes:
-        assert struct.unpack('>H', z.read(name)[6:8])[0] == 65, f'Not Java 21: {name}'
+        assert struct.unpack('>H', z.read(name)[6:8])[0] == 69, f'Not Java 25: {name}'
     assert '${' not in z.read('META-INF/neoforge.mods.toml').decode(), 'Unexpanded metadata'
 
 baseline = project / '.template-baselines.json'
@@ -70,5 +73,5 @@ if baseline.exists():
             assert hashlib.sha256((project.parent / directory / path).read_bytes()).hexdigest() == digest, f'Template changed: {directory}/{path}'
     print('Original Forge and NeoForge templates verified unchanged.')
 
-print(f'Validated {len(parsed)} JSON resources, {len(languages[0])} bilingual keys, {len(classes)} Java 21 classes, and packaged metadata.')
+print(f'Validated {len(parsed)} JSON resources, {len(languages[0])} bilingual keys, {len(classes)} Java 25 classes, and packaged metadata.')
 print('JAR SHA-256:', hashlib.sha256(jar.read_bytes()).hexdigest())

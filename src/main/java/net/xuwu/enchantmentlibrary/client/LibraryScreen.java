@@ -1,6 +1,8 @@
 package net.xuwu.enchantmentlibrary.client;
 
-import com.mojang.blaze3d.systems.RenderSystem;
+import net.minecraft.client.renderer.RenderPipelines;
+import net.minecraft.client.input.KeyEvent;
+import net.minecraft.client.input.MouseButtonEvent;
 import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -10,7 +12,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.AbstractSliderButton;
 import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.Button;
@@ -21,14 +23,14 @@ import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.core.Holder;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.enchantment.Enchantment;
 import net.minecraft.world.item.enchantment.EnchantmentHelper;
-import net.neoforged.neoforge.network.PacketDistributor;
+import net.neoforged.neoforge.client.network.ClientPacketDistributor;
 import net.xuwu.enchantmentlibrary.menu.LibraryMenu;
 import net.xuwu.enchantmentlibrary.network.LibraryNetwork;
 import net.xuwu.enchantmentlibrary.storage.EnchantmentBatch;
@@ -36,16 +38,16 @@ import net.xuwu.enchantmentlibrary.storage.EnchantmentLedger;
 import org.lwjgl.glfw.GLFW;
 
 public final class LibraryScreen extends AbstractContainerScreen<LibraryMenu> {
-    private static final ResourceLocation CONTAINER = ResourceLocation.withDefaultNamespace("textures/gui/container/generic_54.png");
-    private static final ResourceLocation SCROLLER = ResourceLocation.withDefaultNamespace("widget/scroller");
-    private static final ResourceLocation SCROLLER_BACKGROUND = ResourceLocation.withDefaultNamespace("widget/scroller_background");
+    private static final Identifier CONTAINER = Identifier.withDefaultNamespace("textures/gui/container/generic_54.png");
+    private static final Identifier SCROLLER = Identifier.withDefaultNamespace("widget/scroller");
+    private static final Identifier SCROLLER_BACKGROUND = Identifier.withDefaultNamespace("widget/scroller_background");
     private static final int ROWS = 4, LIST_X = 122, LIST_Y = 43, LIST_W = 206, ROW_H = 24;
-    private final Map<ResourceLocation, Integer> chosenLevels = new HashMap<>();
-    private final Set<ResourceLocation> checked = new LinkedHashSet<>();
+    private final Map<Identifier, Integer> chosenLevels = new HashMap<>();
+    private final Set<Identifier> checked = new LinkedHashSet<>();
     private final List<AbstractWidget> rowWidgets = new ArrayList<>();
-    private final Map<ResourceLocation, Checkbox> checkboxes = new HashMap<>();
-    private final Map<ResourceLocation, LevelSlider> sliders = new HashMap<>();
-    private final Map<ResourceLocation, ItemStack> icons = new HashMap<>();
+    private final Map<Identifier, Checkbox> checkboxes = new HashMap<>();
+    private final Map<Identifier, LevelSlider> sliders = new HashMap<>();
+    private final Map<Identifier, ItemStack> icons = new HashMap<>();
     private EditBox search;
     private Button store, withdraw, enchant, clear;
     private List<LibraryNetwork.Entry> visible = List.of();
@@ -54,9 +56,7 @@ public final class LibraryScreen extends AbstractContainerScreen<LibraryMenu> {
     private LevelSlider draggingLevelSlider;
 
     public LibraryScreen(LibraryMenu menu, Inventory inventory, Component title) {
-        super(menu, inventory, title);
-        imageWidth = 336;
-        imageHeight = 236;
+        super(menu, inventory, title, 336, 236);
     }
 
     @Override
@@ -99,14 +99,14 @@ public final class LibraryScreen extends AbstractContainerScreen<LibraryMenu> {
         return holder == null ? 1 : Math.max(1, holder.value().getMinLevel());
     }
 
-    private Map<ResourceLocation, Integer> selection() {
-        Map<ResourceLocation, Integer> result = new LinkedHashMap<>();
+    private Map<Identifier, Integer> selection() {
+        Map<Identifier, Integer> result = new LinkedHashMap<>();
         checked.forEach(id -> result.put(id, chosenLevels.getOrDefault(id, 1)));
         return result;
     }
 
     private void refresh() {
-        Set<ResourceLocation> available = new LinkedHashSet<>();
+        Set<Identifier> available = new LinkedHashSet<>();
         for (LibraryNetwork.Entry entry : menu.entries()) {
             available.add(entry.id());
             int min = minimum(entry);
@@ -124,13 +124,13 @@ public final class LibraryScreen extends AbstractContainerScreen<LibraryMenu> {
         lastRevision = menu.viewRevision();
     }
 
-    private void setChecked(ResourceLocation id, boolean value) {
+    private void setChecked(Identifier id, boolean value) {
         Checkbox checkbox = checkboxes.get(id);
         if (value && !checked.contains(id) && checked.size() >= EnchantmentBatch.MAX_SELECTIONS) {
-            if (checkbox != null && checkbox.selected()) checkbox.onPress();
+            if (checkbox != null && checkbox.selected()) checkbox.onPress(new KeyEvent(GLFW.GLFW_KEY_SPACE, 0, 0));
             return;
         }
-        if (checkbox != null && checkbox.selected() != value) { checkbox.onPress(); return; }
+        if (checkbox != null && checkbox.selected() != value) { checkbox.onPress(new KeyEvent(GLFW.GLFW_KEY_SPACE, 0, 0)); return; }
         if (value) checked.add(id);
         else checked.remove(id);
     }
@@ -160,7 +160,7 @@ public final class LibraryScreen extends AbstractContainerScreen<LibraryMenu> {
         }
     }
 
-    private void updateIcon(ResourceLocation id) {
+    private void updateIcon(Identifier id) {
         ItemStack icon = new ItemStack(Items.ENCHANTED_BOOK);
         Holder<Enchantment> holder = menu.enchantment(id);
         if (holder != null) icon.enchant(holder, chosenLevels.getOrDefault(id, 1));
@@ -168,9 +168,9 @@ public final class LibraryScreen extends AbstractContainerScreen<LibraryMenu> {
     }
 
     private void send(int action) {
-        Map<ResourceLocation, Integer> levels = action == LibraryNetwork.STORE ? Map.of() : selection();
+        Map<Identifier, Integer> levels = action == LibraryNetwork.STORE ? Map.of() : selection();
         if (action != LibraryNetwork.STORE && levels.isEmpty()) return;
-        PacketDistributor.sendToServer(new LibraryNetwork.Action(menu.containerId, action, levels));
+        ClientPacketDistributor.sendToServer(new LibraryNetwork.Action(menu.containerId, action, levels));
     }
 
     @Override protected void containerTick() {
@@ -179,26 +179,25 @@ public final class LibraryScreen extends AbstractContainerScreen<LibraryMenu> {
     }
 
     @Override
-    public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+    public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
         if (lastRevision != menu.viewRevision()) refresh();
-        Map<ResourceLocation, Integer> levels = selection();
+        Map<Identifier, Integer> levels = selection();
         store.active = EnchantmentHelper.hasAnyEnchantments(menu.getSlot(LibraryMenu.DEPOSIT).getItem());
         enchant.active = menu.canEnchant(levels);
         withdraw.active = menu.canWithdraw(levels);
         clear.active = !checked.isEmpty();
-        super.render(graphics, mouseX, mouseY, partialTick);
-        renderTooltip(graphics, mouseX, mouseY);
+        super.extractRenderState(graphics, mouseX, mouseY, partialTick);
         int hovered = rowAt(mouseX, mouseY);
         if (hovered >= 0) {
             LibraryNetwork.Entry entry = visible.get(hovered);
             int rowY = topPos + LIST_Y + (hovered - scroll) * ROW_H;
             if (mouseX >= leftPos + LIST_X + 21 && mouseX < leftPos + LIST_X + 39) {
-                graphics.renderTooltip(font, icons.get(entry.id()), mouseX, mouseY);
+                graphics.setTooltipForNextFrame(font, icons.get(entry.id()), mouseX, mouseY);
             } else if (mouseY < rowY + 13 && mouseX >= leftPos + LIST_X + 41) {
                 int level = chosenLevels.get(entry.id());
                 BigInteger cost = level > EnchantmentLedger.MAX_BITS ? BigInteger.ZERO :
                         menu.getSlot(LibraryMenu.TARGET).getItem().is(Items.BOOK) ? EnchantmentLedger.cost(level) : menu.enchantCost(entry.id(), level);
-                graphics.renderComponentTooltip(font, List.of(Component.literal(name(entry)), Component.literal(entry.id().toString()),
+                graphics.setComponentTooltipForNextFrame(font, List.of(Component.literal(name(entry)), Component.literal(entry.id().toString()),
                         tr("points", entry.points().toString()), tr("maximum", entry.maxLevel()), tr("cost", cost.max(BigInteger.ZERO).toString())), mouseX, mouseY);
             }
         } else if (isHovering(180, 5, 98, 16, mouseX, mouseY) && !checked.isEmpty()) {
@@ -208,18 +207,19 @@ public final class LibraryScreen extends AbstractContainerScreen<LibraryMenu> {
                 if (checked.contains(entry.id())) tooltip.add(Component.literal(name(entry) + " " + chosenLevels.get(entry.id())));
             }
             tooltip.add(tr("batch_help"));
-            graphics.renderComponentTooltip(font, tooltip, mouseX, mouseY);
+            graphics.setComponentTooltipForNextFrame(font, tooltip, mouseX, mouseY);
         }
         for (int i = 0; i < 3; i++) {
             var slot = menu.getSlot(i);
             if (!slot.hasItem() && isHovering(slot.x, slot.y, 16, 16, mouseX, mouseY)) {
-                graphics.renderTooltip(font, tr(switch (i) { case 0 -> "deposit_slot"; case 1 -> "target_slot"; default -> "output_slot"; }), mouseX, mouseY);
+                graphics.setTooltipForNextFrame(font, tr(switch (i) { case 0 -> "deposit_slot"; case 1 -> "target_slot"; default -> "output_slot"; }), mouseX, mouseY);
             }
         }
     }
 
     @Override
-    protected void renderBg(GuiGraphics graphics, float partialTick, int mouseX, int mouseY) {
+    public void extractBackground(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
+        super.extractBackground(graphics, mouseX, mouseY, partialTick);
         drawContainer(graphics, leftPos, topPos, imageWidth, imageHeight);
         for (var slot : menu.slots) drawSlot(graphics, leftPos + slot.x - 1, topPos + slot.y - 1);
         int x = leftPos + LIST_X, y = topPos + LIST_Y;
@@ -232,23 +232,23 @@ public final class LibraryScreen extends AbstractContainerScreen<LibraryMenu> {
             graphics.fill(x, rowY, x + LIST_W - 9, rowY + ROW_H - 1, selected ? 0xFFABB890 : hover ? 0xFFC0C0C0 : 0xFFB4B4B4);
             drawSlot(graphics, x + 21, rowY + 3);
             ItemStack icon = icons.get(entry.id());
-            graphics.renderItem(icon, x + 22, rowY + 4);
-            graphics.renderItemDecorations(font, icon, x + 22, rowY + 4);
+            graphics.item(icon, x + 22, rowY + 4);
+            graphics.itemDecorations(font, icon, x + 22, rowY + 4);
             String amount = compact(entry.points());
             int amountWidth = font.width(amount);
             String label = font.plainSubstrByWidth(name(entry), LIST_W - 58 - amountWidth);
-            graphics.drawString(font, label, x + 42, rowY + 2, 0xFF303030, false);
-            graphics.drawString(font, amount, x + LIST_W - 13 - amountWidth, rowY + 2, 0xFF404040, false);
+            graphics.text(font, label, x + 42, rowY + 2, 0xFF303030, false);
+            graphics.text(font, amount, x + LIST_W - 13 - amountWidth, rowY + 2, 0xFF404040, false);
             String level = chosenLevels.get(entry.id()) + "/" + entry.maxLevel();
             if (font.width(level) > 34) level = chosenLevels.get(entry.id()).toString();
-            graphics.drawString(font, font.plainSubstrByWidth(level, 34), x + 163, rowY + 14, 0xFF404040, false);
+            graphics.text(font, font.plainSubstrByWidth(level, 34), x + 163, rowY + 14, 0xFF404040, false);
         }
-        if (visible.isEmpty()) graphics.drawCenteredString(font, tr(menu.entries().isEmpty() ? "empty" : "no_results"), x + LIST_W / 2, y + 42, 0xFFE0E0E0);
+        if (visible.isEmpty()) graphics.centeredText(font, tr(menu.entries().isEmpty() ? "empty" : "no_results"), x + LIST_W / 2, y + 42, 0xFFE0E0E0);
         int trackX = x + LIST_W - 8;
-        graphics.blitSprite(SCROLLER_BACKGROUND, trackX, y, 8, ROWS * ROW_H);
+        graphics.blitSprite(RenderPipelines.GUI_TEXTURED, SCROLLER_BACKGROUND, trackX, y, 8, ROWS * ROW_H);
         int thumbHeight = thumbHeight();
         int thumbY = y + (visible.size() <= ROWS ? 0 : (ROWS * ROW_H - thumbHeight) * scroll / (visible.size() - ROWS));
-        graphics.blitSprite(SCROLLER, trackX, thumbY, 8, thumbHeight);
+        graphics.blitSprite(RenderPipelines.GUI_TEXTURED, SCROLLER, trackX, thumbY, 8, thumbHeight);
     }
 
     private int thumbHeight() { return Math.max(12, ROWS * ROW_H * ROWS / Math.max(ROWS, visible.size())); }
@@ -258,8 +258,7 @@ public final class LibraryScreen extends AbstractContainerScreen<LibraryMenu> {
     }
 
     /** The original chest texture supplies the rounded corners, bevels and slots, including resource-pack replacements. */
-    private static void drawContainer(GuiGraphics graphics, int x, int y, int width, int height) {
-        RenderSystem.enableBlend();
+    private static void drawContainer(GuiGraphicsExtractor graphics, int x, int y, int width, int height) {
         patch(graphics, x + 5, y + 5, width - 10, height - 10, 5, 5, 1, 1);
         patch(graphics, x, y, 5, 5, 0, 0, 5, 5);
         patch(graphics, x + width - 5, y, 5, 5, 171, 0, 5, 5);
@@ -270,19 +269,19 @@ public final class LibraryScreen extends AbstractContainerScreen<LibraryMenu> {
         patch(graphics, x, y + 5, 5, height - 10, 0, 5, 5, 1);
         patch(graphics, x + width - 5, y + 5, 5, height - 10, 171, 5, 5, 1);
     }
-    private static void patch(GuiGraphics graphics, int x, int y, int width, int height, int u, int v, int sourceWidth, int sourceHeight) {
-        graphics.blit(CONTAINER, x, y, width, height, (float) u, (float) v, sourceWidth, sourceHeight, 256, 256);
+    private static void patch(GuiGraphicsExtractor graphics, int x, int y, int width, int height, int u, int v, int sourceWidth, int sourceHeight) {
+        graphics.blit(RenderPipelines.GUI_TEXTURED, CONTAINER, x, y, (float) u, (float) v, width, height, sourceWidth, sourceHeight, 256, 256);
     }
-    private static void drawSlot(GuiGraphics graphics, int x, int y) { graphics.blit(CONTAINER, x, y, 7, 17, 18, 18); }
+    private static void drawSlot(GuiGraphicsExtractor graphics, int x, int y) { graphics.blit(RenderPipelines.GUI_TEXTURED, CONTAINER, x, y, 7, 17, 18, 18, 256, 256); }
 
     @Override
-    protected void renderLabels(GuiGraphics graphics, int mouseX, int mouseY) {
-        graphics.drawString(font, font.plainSubstrByWidth(title.getString(), 164), 8, 7, 0xFF404040, false);
-        graphics.drawString(font, tr("selected_count", checked.size()), 180, 8, 0xFF404040, false);
-        graphics.drawString(font, tr("deposit"), 8, 27, 0xFF404040, false);
-        graphics.drawString(font, tr("target"), 8, 68, 0xFF404040, false);
-        graphics.drawString(font, tr("output"), 8, 107, 0xFF404040, false);
-        graphics.drawString(font, playerInventoryTitle, 87, 143, 0xFF404040, false);
+    protected void extractLabels(GuiGraphicsExtractor graphics, int mouseX, int mouseY) {
+        graphics.text(font, font.plainSubstrByWidth(title.getString(), 164), 8, 7, 0xFF404040, false);
+        graphics.text(font, tr("selected_count", checked.size()), 180, 8, 0xFF404040, false);
+        graphics.text(font, tr("deposit"), 8, 27, 0xFF404040, false);
+        graphics.text(font, tr("target"), 8, 68, 0xFF404040, false);
+        graphics.text(font, tr("output"), 8, 107, 0xFF404040, false);
+        graphics.text(font, playerInventoryTitle, 87, 143, 0xFF404040, false);
     }
 
     private int rowAt(double mouseX, double mouseY) {
@@ -293,13 +292,15 @@ public final class LibraryScreen extends AbstractContainerScreen<LibraryMenu> {
     }
 
     @Override
-    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+    public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
+        double mouseX = event.x(), mouseY = event.y();
+        int button = event.button();
         if (button == 1 && search.isMouseOver(mouseX, mouseY)) { search.setValue(""); return true; }
         int row = rowAt(mouseX, mouseY);
         if (button == 0 && row >= 0) {
             LibraryNetwork.Entry entry = visible.get(row);
             if (checkboxes.get(entry.id()).isMouseOver(mouseX, mouseY) || sliders.get(entry.id()).isMouseOver(mouseX, mouseY)) {
-                boolean handled = super.mouseClicked(mouseX, mouseY, button);
+                boolean handled = super.mouseClicked(event, doubleClick);
                 LevelSlider slider = sliders.get(entry.id());
                 if (handled && slider.active && slider.isMouseOver(mouseX, mouseY)) draggingLevelSlider = slider;
                 return handled;
@@ -315,7 +316,7 @@ public final class LibraryScreen extends AbstractContainerScreen<LibraryMenu> {
             dragScrollbar(mouseY);
             return true;
         }
-        return super.mouseClicked(mouseX, mouseY, button);
+        return super.mouseClicked(event, doubleClick);
     }
 
     private void setScroll(int value) {
@@ -326,24 +327,27 @@ public final class LibraryScreen extends AbstractContainerScreen<LibraryMenu> {
         int travel = ROWS * ROW_H - thumbHeight();
         if (travel > 0) setScroll((int) Math.round((mouseY - topPos - LIST_Y - thumbHeight() / 2.0) / travel * Math.max(0, visible.size() - ROWS)));
     }
-    @Override public boolean mouseDragged(double x, double y, int button, double dx, double dy) {
+    @Override public boolean mouseDragged(MouseButtonEvent event, double dx, double dy) {
+        double y = event.y();
+        int button = event.button();
         if (draggingScrollbar && button == 0) { dragScrollbar(y); return true; }
         // AbstractContainerScreen handles inventory drags without forwarding them to focused widgets.
         if (draggingLevelSlider != null && button == 0) {
-            draggingLevelSlider.mouseDragged(x, y, button, dx, dy);
+            draggingLevelSlider.mouseDragged(event, dx, dy);
             return true;
         }
-        return super.mouseDragged(x, y, button, dx, dy);
+        return super.mouseDragged(event, dx, dy);
     }
-    @Override public boolean mouseReleased(double x, double y, int button) {
+    @Override public boolean mouseReleased(MouseButtonEvent event) {
+        int button = event.button();
         if (button == 0 && (draggingLevelSlider != null || draggingScrollbar)) {
-            if (draggingLevelSlider != null) draggingLevelSlider.mouseReleased(x, y, button);
+            if (draggingLevelSlider != null) draggingLevelSlider.mouseReleased(event);
             draggingLevelSlider = null;
             draggingScrollbar = false;
             setDragging(false);
             return true;
         }
-        return super.mouseReleased(x, y, button);
+        return super.mouseReleased(event);
     }
     @Override public boolean mouseScrolled(double x, double y, double dx, double dy) {
         if (x >= leftPos + LIST_X && x < leftPos + LIST_X + LIST_W && y >= topPos + LIST_Y && y < topPos + LIST_Y + ROWS * ROW_H) {
@@ -351,18 +355,19 @@ public final class LibraryScreen extends AbstractContainerScreen<LibraryMenu> {
         }
         return super.mouseScrolled(x, y, dx, dy);
     }
-    @Override public boolean keyPressed(int key, int scanCode, int modifiers) {
+    @Override public boolean keyPressed(KeyEvent event) {
+        int key = event.key();
         if (key != GLFW.GLFW_KEY_ESCAPE && search.isFocused()) {
             if (key == GLFW.GLFW_KEY_ENTER || key == GLFW.GLFW_KEY_KP_ENTER) { setFocused(null); return true; }
-            if (key == GLFW.GLFW_KEY_TAB) return super.keyPressed(key, scanCode, modifiers);
-            search.keyPressed(key, scanCode, modifiers);
+            if (key == GLFW.GLFW_KEY_TAB) return super.keyPressed(event);
+            search.keyPressed(event);
             return true;
         }
-        return super.keyPressed(key, scanCode, modifiers);
+        return super.keyPressed(event);
     }
 
     private final class LevelSlider extends AbstractSliderButton {
-        private final ResourceLocation id;
+        private final Identifier id;
         private final int min, max;
 
         LevelSlider(LibraryNetwork.Entry entry, int x, int y, int width, int height) {
@@ -383,9 +388,10 @@ public final class LibraryScreen extends AbstractContainerScreen<LibraryMenu> {
             setChecked(id, true);
             updateIcon(id);
         }
-        @Override public boolean keyPressed(int key, int scanCode, int modifiers) {
+        @Override public boolean keyPressed(KeyEvent event) {
+            int key = event.key();
             if (key == GLFW.GLFW_KEY_LEFT || key == GLFW.GLFW_KEY_RIGHT || key == GLFW.GLFW_KEY_HOME || key == GLFW.GLFW_KEY_END) {
-                int step = hasShiftDown() ? 5 : 1;
+                int step = event.hasShiftDown() ? 5 : 1;
                 long desired = key == GLFW.GLFW_KEY_HOME ? min : key == GLFW.GLFW_KEY_END ? max :
                         (long) chosenLevels.get(id) + (key == GLFW.GLFW_KEY_LEFT ? -step : step);
                 chosenLevels.put(id, (int) Math.clamp(desired, min, max));
@@ -395,7 +401,7 @@ public final class LibraryScreen extends AbstractContainerScreen<LibraryMenu> {
                 updateMessage();
                 return true;
             }
-            return super.keyPressed(key, scanCode, modifiers);
+            return super.keyPressed(event);
         }
     }
 }

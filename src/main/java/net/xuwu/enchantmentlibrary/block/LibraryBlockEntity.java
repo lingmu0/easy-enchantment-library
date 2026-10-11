@@ -1,16 +1,15 @@
 package net.xuwu.enchantmentlibrary.block;
 
 import java.math.BigInteger;
-import java.util.HashMap;
-import java.util.Map;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.HolderLookup;
+import net.minecraft.core.component.DataComponentGetter;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
 import net.minecraft.core.NonNullList;
 import net.minecraft.core.component.DataComponentMap;
 import net.minecraft.core.component.DataComponents;
-import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.Container;
 import net.minecraft.world.ContainerHelper;
 import net.minecraft.world.MenuProvider;
@@ -28,40 +27,27 @@ import net.xuwu.enchantmentlibrary.storage.LibraryContents;
 
 public final class LibraryBlockEntity extends BlockEntity implements Container, MenuProvider {
     private final NonNullList<ItemStack> items = NonNullList.withSize(3, ItemStack.EMPTY);
-    private final EnchantmentLedger<ResourceLocation> ledger = new EnchantmentLedger<>();
+    private final EnchantmentLedger<Identifier> ledger = new EnchantmentLedger<>();
 
     public LibraryBlockEntity(BlockPos pos, BlockState state) { super(EnchantmentLibrary.LIBRARY_ENTITY.get(), pos, state); }
-    public EnchantmentLedger<ResourceLocation> ledger() { return ledger; }
+    public EnchantmentLedger<Identifier> ledger() { return ledger; }
     public boolean hasContents() { return !isEmpty() || !ledger.snapshot().isEmpty(); }
     @Override public Component getDisplayName() { return Component.translatable("block.enchantment_library.enchantment_library"); }
     @Override public AbstractContainerMenu createMenu(int id, Inventory inventory, Player player) { return new LibraryMenu(id, inventory, this); }
 
     @Override
-    protected void saveAdditional(CompoundTag tag, HolderLookup.Provider registries) {
-        super.saveAdditional(tag, registries);
-        ContainerHelper.saveAllItems(tag, items, registries);
-        CompoundTag storage = new CompoundTag();
-        ledger.snapshot().forEach((id, amount) -> storage.putString(id.toString(), amount.toString()));
-        tag.put("StoredEnchantments", storage);
+    protected void saveAdditional(ValueOutput output) {
+        super.saveAdditional(output);
+        ContainerHelper.saveAllItems(output, items);
+        output.store("StoredEnchantments", LibraryContents.CODEC, new LibraryContents(ledger.snapshot()));
     }
 
     @Override
-    protected void loadAdditional(CompoundTag tag, HolderLookup.Provider registries) {
-        super.loadAdditional(tag, registries);
+    protected void loadAdditional(ValueInput input) {
+        super.loadAdditional(input);
         items.clear();
-        ContainerHelper.loadAllItems(tag, items, registries);
-        Map<ResourceLocation, BigInteger> values = new HashMap<>();
-        CompoundTag storage = tag.getCompound("StoredEnchantments");
-        for (String key : storage.getAllKeys()) {
-            ResourceLocation id = ResourceLocation.tryParse(key);
-            try {
-                BigInteger amount = EnchantmentLedger.parse(storage.getString(key));
-                if (id != null && amount.signum() > 0) values.put(id, amount);
-            } catch (IllegalArgumentException exception) {
-                EnchantmentLibrary.LOGGER.warn("Ignoring invalid library entry {} at {}", key, worldPosition);
-            }
-        }
-        ledger.replace(values);
+        ContainerHelper.loadAllItems(input, items);
+        ledger.replace(input.read("StoredEnchantments", LibraryContents.CODEC).orElse(LibraryContents.EMPTY).points());
     }
 
     @Override
@@ -72,13 +58,13 @@ public final class LibraryBlockEntity extends BlockEntity implements Container, 
     }
 
     @Override
-    protected void applyImplicitComponents(DataComponentInput input) {
+    protected void applyImplicitComponents(DataComponentGetter input) {
         super.applyImplicitComponents(input);
         ledger.replace(input.getOrDefault(EnchantmentLibrary.CONTENTS.get(), LibraryContents.EMPTY).points());
         input.getOrDefault(DataComponents.CONTAINER, ItemContainerContents.EMPTY).copyInto(items);
     }
 
-    @Override public void removeComponentsFromTag(CompoundTag tag) { super.removeComponentsFromTag(tag); tag.remove("StoredEnchantments"); tag.remove("Items"); }
+    @Override public void removeComponentsFromTag(ValueOutput output) { super.removeComponentsFromTag(output); output.discard("StoredEnchantments"); output.discard("Items"); }
     @Override public int getContainerSize() { return items.size(); }
     @Override public boolean isEmpty() { return items.stream().allMatch(ItemStack::isEmpty); }
     @Override public ItemStack getItem(int slot) { return items.get(slot); }

@@ -8,7 +8,8 @@ def write(path, value):
     dest.parent.mkdir(parents=True, exist_ok=True)
     dest.write_text(json.dumps(value, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
 
-write('pack.mcmeta', {'pack': {'pack_format': 34, 'supported_formats': {'min_inclusive': 34, 'max_inclusive': 48},
+# 26.1.2 resource packs use 84.0; data packs use 101.1.
+write('pack.mcmeta', {'pack': {'min_format': [84, 0], 'max_format': [101, 1],
     'description': 'Enchantment Library resources'}})
 write('assets/enchantment_library/blockstates/enchantment_library.json', {'variants': {
     f'facing={facing}': {'model': 'enchantment_library:block/enchantment_library', 'y': rotation}
@@ -26,11 +27,12 @@ write('assets/enchantment_library/models/block/enchantment_library.json', {
         {'from': [2, 16, 2], 'to': [14, 16.05, 14], 'faces': {'up': {'texture': '#top', 'uv': [0, 0, 16, 16]}}},
     ]
 })
-write('assets/enchantment_library/models/item/enchantment_library.json', {'parent': 'enchantment_library:block/enchantment_library'})
+write('assets/enchantment_library/items/enchantment_library.json', {
+    'model': {'type': 'minecraft:model', 'model': 'enchantment_library:block/enchantment_library'}})
 write('data/enchantment_library/recipe/enchantment_library.json', {
     'type': 'minecraft:crafting_shaped', 'category': 'misc', 'pattern': ['BGB', 'OEO', 'OOO'],
-    'key': {'B': {'item': 'minecraft:bookshelf'}, 'G': {'item': 'minecraft:gold_ingot'},
-        'O': {'item': 'minecraft:obsidian'}, 'E': {'item': 'minecraft:enchanting_table'}},
+    'key': {'B': 'minecraft:bookshelf', 'G': 'minecraft:gold_ingot',
+        'O': 'minecraft:obsidian', 'E': 'minecraft:enchanting_table'},
     'result': {'id': 'enchantment_library:enchantment_library', 'count': 1}
 })
 write('data/enchantment_library/loot_table/blocks/enchantment_library.json', {

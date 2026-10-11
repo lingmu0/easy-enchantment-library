@@ -10,7 +10,7 @@ import net.minecraft.core.registries.Registries;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceKey;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.Container;
 import net.minecraft.world.SimpleContainer;
@@ -77,9 +77,9 @@ public final class LibraryMenu extends AbstractContainerMenu {
     public List<LibraryNetwork.Entry> entries() { return entries; }
     public int viewRevision() { return viewRevision; }
     public void updateEntries(List<LibraryNetwork.Entry> entries) { this.entries = List.copyOf(entries); viewRevision++; }
-    public Holder.Reference<Enchantment> enchantment(ResourceLocation id) {
-        return player.level().registryAccess().registryOrThrow(Registries.ENCHANTMENT)
-                .getHolder(ResourceKey.create(Registries.ENCHANTMENT, id)).orElse(null);
+    public Holder.Reference<Enchantment> enchantment(Identifier id) {
+        return player.level().registryAccess().lookupOrThrow(Registries.ENCHANTMENT)
+                .get(ResourceKey.create(Registries.ENCHANTMENT, id)).orElse(null);
     }
 
     @Override public boolean stillValid(Player player) { return library == null || library.stillValid(player); }
@@ -102,7 +102,7 @@ public final class LibraryMenu extends AbstractContainerMenu {
         lastLimitCheck = tick;
     }
 
-    public void perform(int action, Map<ResourceLocation, Integer> levels) {
+    public void perform(int action, Map<Identifier, Integer> levels) {
         if (library == null || player.isSpectator() || !stillValid(player)) return;
         boolean success = switch (action) {
             case LibraryNetwork.STORE -> deposit();
@@ -115,7 +115,7 @@ public final class LibraryMenu extends AbstractContainerMenu {
             broadcastChanges();
             player.level().playSound(null, library.getBlockPos(), net.minecraft.sounds.SoundEvents.ENCHANTMENT_TABLE_USE,
                     net.minecraft.sounds.SoundSource.BLOCKS, 0.5F, 1.0F);
-        } else player.displayClientMessage(Component.translatable("message.enchantment_library.failed"), true);
+        } else player.sendOverlayMessage(Component.translatable("message.enchantment_library.failed"));
     }
 
     private boolean canOutput(ItemStack result) {
@@ -131,12 +131,12 @@ public final class LibraryMenu extends AbstractContainerMenu {
     private boolean deposit() {
         ItemStack input = container.getItem(DEPOSIT);
         if (input.isEmpty() || !EnchantmentHelper.hasAnyEnchantments(input)) return false;
-        Map<ResourceLocation, BigInteger> additions = new HashMap<>();
+        Map<Identifier, BigInteger> additions = new HashMap<>();
         for (ItemEnchantments enchantments : List.of(input.getOrDefault(DataComponents.ENCHANTMENTS, ItemEnchantments.EMPTY),
                 input.getOrDefault(DataComponents.STORED_ENCHANTMENTS, ItemEnchantments.EMPTY))) {
             for (var entry : enchantments.entrySet()) {
                 if (entry.getIntValue() < 1 || entry.getIntValue() > EnchantmentLedger.MAX_BITS || entry.getKey().unwrapKey().isEmpty()) return false;
-                additions.merge(entry.getKey().unwrapKey().orElseThrow().location(), EnchantmentLedger.cost(entry.getIntValue()), BigInteger::add);
+                additions.merge(entry.getKey().unwrapKey().orElseThrow().identifier(), EnchantmentLedger.cost(entry.getIntValue()), BigInteger::add);
             }
         }
         ItemStack clean = input.is(Items.ENCHANTED_BOOK) ? input.transmuteCopy(Items.BOOK, 1) : input.copyWithCount(1);
@@ -152,14 +152,14 @@ public final class LibraryMenu extends AbstractContainerMenu {
         return enchantment != null && level >= enchantment.value().getMinLevel() && level <= enchantment.value().getMaxLevel();
     }
 
-    public boolean canWithdraw(Map<ResourceLocation, Integer> levels) { return previewBatch(levels, true) != null; }
-    public boolean canEnchant(Map<ResourceLocation, Integer> levels) { return previewBatch(levels, false) != null; }
+    public boolean canWithdraw(Map<Identifier, Integer> levels) { return previewBatch(levels, true) != null; }
+    public boolean canEnchant(Map<Identifier, Integer> levels) { return previewBatch(levels, false) != null; }
 
-    private BigInteger points(ResourceLocation id) {
+    private BigInteger points(Identifier id) {
         return library != null ? library.ledger().get(id) : entries.stream().filter(e -> e.id().equals(id)).map(LibraryNetwork.Entry::points).findFirst().orElse(BigInteger.ZERO);
     }
 
-    public BigInteger enchantCost(ResourceLocation id, int level) {
+    public BigInteger enchantCost(Identifier id, int level) {
         Holder<Enchantment> enchantment = enchantment(id);
         if (!validLevel(enchantment, level) || level > EnchantmentLedger.MAX_BITS) return BigInteger.ZERO;
         int existing = EnchantmentHelper.getEnchantmentsForCrafting(container.getItem(TARGET)).getLevel(enchantment);
@@ -167,19 +167,19 @@ public final class LibraryMenu extends AbstractContainerMenu {
         return EnchantmentLedger.cost(level).subtract(existing == 0 ? BigInteger.ZERO : EnchantmentLedger.cost(existing));
     }
 
-    private record BatchPlan(ItemStack result, Map<ResourceLocation, BigInteger> costs) {}
+    private record BatchPlan(ItemStack result, Map<Identifier, BigInteger> costs) {}
 
-    private BatchPlan previewBatch(Map<ResourceLocation, Integer> levels, boolean book) {
+    private BatchPlan previewBatch(Map<Identifier, Integer> levels, boolean book) {
         ItemStack target = container.getItem(TARGET);
         if (target.isEmpty()) return null;
         if (book) {
             if (!target.is(Items.BOOK) || EnchantmentHelper.hasAnyEnchantments(target)) return null;
         } else if (target.is(Items.BOOK) || target.is(Items.ENCHANTED_BOOK) || target.getCount() != 1) return null;
-        Map<ResourceLocation, Integer> existing = new HashMap<>();
+        Map<Identifier, Integer> existing = new HashMap<>();
         if (!book) {
             for (var entry : EnchantmentHelper.getEnchantmentsForCrafting(target).entrySet()) {
                 if (entry.getKey().unwrapKey().isEmpty()) return null;
-                existing.put(entry.getKey().unwrapKey().orElseThrow().location(), entry.getIntValue());
+                existing.put(entry.getKey().unwrapKey().orElseThrow().identifier(), entry.getIntValue());
             }
         }
         var planned = EnchantmentBatch.plan(levels, existing, id -> {
@@ -191,7 +191,7 @@ public final class LibraryMenu extends AbstractContainerMenu {
             return a != null && b != null && Enchantment.areCompatible(a, b);
         });
         if (planned.isEmpty()) return null;
-        Map<ResourceLocation, BigInteger> costs = planned.get();
+        Map<Identifier, BigInteger> costs = planned.get();
         if (costs.entrySet().stream().anyMatch(entry -> points(entry.getKey()).compareTo(entry.getValue()) < 0)) return null;
         ItemStack result = book ? target.transmuteCopy(Items.ENCHANTED_BOOK, 1) : target.copy();
         for (var entry : levels.entrySet()) {
@@ -203,7 +203,7 @@ public final class LibraryMenu extends AbstractContainerMenu {
         return new BatchPlan(result, costs);
     }
 
-    private boolean applyBatch(Map<ResourceLocation, Integer> levels, boolean book) {
+    private boolean applyBatch(Map<Identifier, Integer> levels, boolean book) {
         BatchPlan plan = previewBatch(levels, book);
         if (plan == null || !library.ledger().withdrawAll(plan.costs())) return false;
         if (book) {

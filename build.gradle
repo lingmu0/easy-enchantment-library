@@ -1,12 +1,12 @@
 plugins {
     id 'java-library'
-    id 'net.neoforged.moddev' version '2.0.144'
+    id 'net.neoforged.moddev' version '2.0.146'
 }
 
 version = mod_version
 group = mod_group_id
 base { archivesName = mod_id }
-java.toolchain.languageVersion = JavaLanguageVersion.of(21)
+java.toolchain.languageVersion = JavaLanguageVersion.of(25)
 java.withSourcesJar()
 
 sourceSets.test {
@@ -31,8 +31,7 @@ tasks.named('jar') { from('LICENSE'); includeEmptyDirs = false }
 var generateModMetadata = tasks.register('generateModMetadata', ProcessResources) {
     var properties = [mod_id: mod_id, mod_name: mod_name, mod_license: mod_license,
         mod_version: mod_version, mod_authors: mod_authors, mod_description: mod_description,
-        minecraft_version_range: minecraft_version_range, neo_version_range: neo_version_range,
-        loader_version_range: loader_version_range]
+        minecraft_version_range: minecraft_version_range, neo_version_range: neo_version_range]
     inputs.properties properties
     expand properties
     from 'src/main/templates'
@@ -61,3 +60,6 @@ tasks.register('batchTest', JavaExec) {
     mainClass = 'net.xuwu.enchantmentlibrary.storage.EnchantmentBatchTest'
 }
 tasks.named('check') { dependsOn 'batchTest' }
+
+// The headless test suites above are executable mains, not JUnit tests.
+tasks.named('test', Test) { failOnNoDiscoveredTests = false }

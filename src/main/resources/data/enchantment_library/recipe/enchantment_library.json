@@ -7,18 +7,10 @@
     "OOO"
   ],
   "key": {
-    "B": {
-      "item": "minecraft:bookshelf"
-    },
-    "G": {
-      "item": "minecraft:gold_ingot"
-    },
-    "O": {
-      "item": "minecraft:obsidian"
-    },
-    "E": {
-      "item": "minecraft:enchanting_table"
-    }
+    "B": "minecraft:bookshelf",
+    "G": "minecraft:gold_ingot",
+    "O": "minecraft:obsidian",
+    "E": "minecraft:enchanting_table"
   },
   "result": {
     "id": "enchantment_library:enchantment_library",

@@ -15,13 +15,13 @@ import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.StateDefinition;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
-import net.minecraft.world.level.block.state.properties.DirectionProperty;
+import net.minecraft.world.level.block.state.properties.EnumProperty;
 import net.minecraft.world.phys.BlockHitResult;
 import net.xuwu.enchantmentlibrary.EnchantmentLibrary;
 
 public final class LibraryBlock extends BaseEntityBlock {
     public static final MapCodec<LibraryBlock> CODEC = simpleCodec(LibraryBlock::new);
-    public static final DirectionProperty FACING = BlockStateProperties.HORIZONTAL_FACING;
+    public static final EnumProperty<Direction> FACING = BlockStateProperties.HORIZONTAL_FACING;
 
     public LibraryBlock(Properties properties) {
         super(properties);
@@ -37,15 +37,15 @@ public final class LibraryBlock extends BaseEntityBlock {
 
     @Override
     protected InteractionResult useWithoutItem(BlockState state, Level level, BlockPos pos, Player player, BlockHitResult hit) {
-        if (!level.isClientSide && level.getBlockEntity(pos) instanceof LibraryBlockEntity library) {
+        if (!level.isClientSide() && level.getBlockEntity(pos) instanceof LibraryBlockEntity library) {
             player.openMenu(library, buf -> buf.writeBlockPos(pos));
         }
-        return InteractionResult.sidedSuccess(level.isClientSide);
+        return InteractionResult.SUCCESS;
     }
 
     @Override
     public BlockState playerWillDestroy(Level level, BlockPos pos, BlockState state, Player player) {
-        if (!level.isClientSide && player.isCreative() && level.getBlockEntity(pos) instanceof LibraryBlockEntity library
+        if (!level.isClientSide() && player.isCreative() && level.getBlockEntity(pos) instanceof LibraryBlockEntity library
                 && library.hasContents()) {
             ItemStack drop = new ItemStack(EnchantmentLibrary.LIBRARY_ITEM.get());
             drop.applyComponents(library.collectComponents());

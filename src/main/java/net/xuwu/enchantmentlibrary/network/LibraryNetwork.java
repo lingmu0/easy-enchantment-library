@@ -8,7 +8,7 @@ import java.util.Map;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 import net.xuwu.enchantmentlibrary.EnchantmentLibrary;
 import net.xuwu.enchantmentlibrary.menu.LibraryMenu;
@@ -18,9 +18,9 @@ import net.xuwu.enchantmentlibrary.storage.EnchantmentBatch;
 public final class LibraryNetwork {
     public static final int STORE = 0, WITHDRAW = 1, ENCHANT = 2;
 
-    public record Entry(ResourceLocation id, BigInteger points, int maxLevel) {}
+    public record Entry(Identifier id, BigInteger points, int maxLevel) {}
 
-    public record Action(int containerId, int action, Map<ResourceLocation, Integer> levels) implements CustomPacketPayload {
+    public record Action(int containerId, int action, Map<Identifier, Integer> levels) implements CustomPacketPayload {
         public Action {
             levels = Map.copyOf(levels);
             if (levels.size() > EnchantmentBatch.MAX_SELECTIONS) throw new IllegalArgumentException("Too many selected enchantments");
@@ -32,16 +32,16 @@ public final class LibraryNetwork {
                 int action = buf.readVarInt();
                 int count = buf.readVarInt();
                 if (count < 0 || count > EnchantmentBatch.MAX_SELECTIONS) throw new IllegalArgumentException("Invalid selection size");
-                Map<ResourceLocation, Integer> levels = new LinkedHashMap<>();
+                Map<Identifier, Integer> levels = new LinkedHashMap<>();
                 for (int i = 0; i < count; i++) {
-                    ResourceLocation id = buf.readResourceLocation();
+                    Identifier id = buf.readIdentifier();
                     if (levels.put(id, buf.readVarInt()) != null) throw new IllegalArgumentException("Duplicate enchantment selection");
                 }
                 return new Action(containerId, action, levels);
             }
             @Override public void encode(RegistryFriendlyByteBuf buf, Action value) {
                 buf.writeVarInt(value.containerId); buf.writeVarInt(value.action); buf.writeVarInt(value.levels.size());
-                value.levels.forEach((id, level) -> { buf.writeResourceLocation(id); buf.writeVarInt(level); });
+                value.levels.forEach((id, level) -> { buf.writeIdentifier(id); buf.writeVarInt(level); });
             }
         };
         @Override public Type<? extends CustomPacketPayload> type() { return TYPE; }
@@ -55,13 +55,13 @@ public final class LibraryNetwork {
                 int size = buf.readVarInt();
                 if (size < 0 || size > 16384) throw new IllegalArgumentException("Invalid library size");
                 List<Entry> entries = new ArrayList<>(size);
-                for (int i = 0; i < size; i++) entries.add(new Entry(buf.readResourceLocation(), EnchantmentLedger.parse(buf.readUtf(EnchantmentLedger.MAX_DIGITS)), buf.readVarInt()));
+                for (int i = 0; i < size; i++) entries.add(new Entry(buf.readIdentifier(), EnchantmentLedger.parse(buf.readUtf(EnchantmentLedger.MAX_DIGITS)), buf.readVarInt()));
                 return new Snapshot(containerId, List.copyOf(entries));
             }
             @Override public void encode(RegistryFriendlyByteBuf buf, Snapshot value) {
                 buf.writeVarInt(value.containerId); buf.writeVarInt(value.entries.size());
                 for (Entry entry : value.entries) {
-                    buf.writeResourceLocation(entry.id()); buf.writeUtf(entry.points().toString(), EnchantmentLedger.MAX_DIGITS); buf.writeVarInt(entry.maxLevel());
+                    buf.writeIdentifier(entry.id()); buf.writeUtf(entry.points().toString(), EnchantmentLedger.MAX_DIGITS); buf.writeVarInt(entry.maxLevel());
                 }
             }
         };
